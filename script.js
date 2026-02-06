@@ -1,97 +1,78 @@
-// REFERENCIAS A LA INTERFAZ
-const etInput = document.getElementById('etInput');
-const btnTraducir = document.getElementById('btnTraducir');
+const input = document.getElementById('my_edit_text');
+const btnTraducir = document.getElementById('my_button');
 const btnExportar = document.getElementById('btnExportar');
-const rvHistorial = document.getElementById('rvHistorial');
+const historial = document.getElementById('rvHistorial');
 const synth = window.speechSynthesis;
 
-let historialData = [];
+let datosHistorial = []; // Equivalente al ViewModel
 
-// FUNCIÓN PRINCIPAL DE TRADUCCIÓN (Google Translate Free)
+// TRADUCIR (MainActivity.kt -> btnTraducir)
 btnTraducir.onclick = async () => {
-    const textoOriginal = etInput.value.trim();
-
-    if (!textoOriginal) {
-        alert("Por favor, escribe algo.");
-        return;
-    }
+    const texto = input.value.trim();
+    if (!texto) return;
 
     btnTraducir.disabled = true;
-    btnTraducir.innerText = "Traduciendo...";
+    btnTraducir.innerText = "...";
 
     try {
-        // Usamos el endpoint gratuito de Google Translate
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
-
+        // API Gratuita de Google
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(texto)}`;
         const response = await fetch(url);
         const data = await response.json();
+        const traducido = data[0][0][0];
 
-        // El formato de Google es un array complejo, el texto traducido está en data[0][0][0]
-        const textoJapones = data[0][0][0];
+        const item = { original: texto, japones: traducido };
+        datosHistorial.push(item);
+        renderizarCard(item);
 
-        const nuevoItem = {
-            id: Date.now(),
-            original: textoOriginal,
-            japones: textoJapones
-        };
-
-        historialData.push(nuevoItem);
-        renderizarCard(nuevoItem);
-
-        etInput.value = "";
-    } catch (error) {
-        console.error("Error:", error);
-        alert("Error al conectar con el servicio de traducción.");
+        input.value = "";
+    } catch (e) {
+        alert("Error de conexión");
     } finally {
         btnTraducir.disabled = false;
         btnTraducir.innerText = "Traducir";
     }
 };
 
-// FUNCIÓN PARA RENDERIZAR
+// RENDERIZAR (TraduccionAdapter equivalente)
 function renderizarCard(item) {
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
-                                                                                                                                                                                                                                                                <div class="texto-container">
-                                                                                                                                                                                                                                                                            <p class="tv-original">${item.original}</p>
-                                                                                                                                                                                                                                                                                        <p class="tv-japones">${item.japones}</p>
-                                                                                                                                                                                                                                                                                                </div>
-                                                                                                                                                                                                                                                                                                        <div class="actions">
-                                                                                                                                                                                                                                                                                                                    <button title="Escuchar" onclick="reproducirVoz('${item.japones}')">🔊</button>
-                                                                                                                                                                                                                                                                                                                                <button title="Copiar" onclick="copiarTexto('${item.japones}')">📋</button>
-                                                                                                                                                                                                                                                                                                                                        </div>
-                                                                                                                                                                                                                                                                                                                                            `;
-    rvHistorial.prepend(card);
+                                                                                                                                                            <div>
+                                                                                                                                                                        <p class="tv-original">${item.original}</p>
+                                                                                                                                                                                    <p class="tv-japones">${item.japones}</p>
+                                                                                                                                                                                            </div>
+                                                                                                                                                                                                    <div class="actions">
+                                                                                                                                                                                                                <button onclick="hablar('${item.japones}')">🔊</button>
+                                                                                                                                                                                                                            <button onclick="copiar('${item.japones}')">📋</button>
+                                                                                                                                                                                                                                    </div>
+                                                                                                                                                                                                                                        `;
+    historial.prepend(card);
 }
 
-// VOZ (Text To Speech)
-function reproducirVoz(texto) {
+// VOZ (fun speak en Kotlin)
+function hablar(texto) {
     const utterance = new SpeechSynthesisUtterance(texto);
     utterance.lang = 'ja-JP';
     synth.speak(utterance);
 }
 
-// COPIAR
-function copiarTexto(texto) {
-    navigator.clipboard.writeText(texto).then(() => {
-        alert("Texto copiado");
-    });
+// COPIAR (copyToClipboard en Kotlin)
+function copiar(texto) {
+    navigator.clipboard.writeText(texto);
+    alert("Copiado");
 }
 
-// EXPORTAR A CSV
+// EXPORTAR (saveCsv en Kotlin)
 btnExportar.onclick = () => {
-    if (historialData.length === 0) return alert("No hay datos para exportar.");
+    if (datosHistorial.length === 0) return;
+    let csv = "\uFEFFOriginal,Japones\n";
+    datosHistorial.forEach(i => csv += `"${i.original}","${i.japones}"\n`);
 
-    let csvContent = "\uFEFFOriginal,Japones\n";
-    historialData.forEach(item => {
-        csvContent += `"${item.original}","${item.japones}"\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "Estudio_Japones.csv");
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = "Estudio_Japones.csv";
     link.click();
 };
