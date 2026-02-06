@@ -1,16 +1,13 @@
-// CONFIGURACIÓN - IMPORTANTE: Reemplaza con tu clave real
-const DEEPL_API_KEY = 'TU_API_KEY_AQUI';
-const synth = window.speechSynthesis;
-
 // REFERENCIAS A LA INTERFAZ
 const etInput = document.getElementById('etInput');
 const btnTraducir = document.getElementById('btnTraducir');
 const btnExportar = document.getElementById('btnExportar');
 const rvHistorial = document.getElementById('rvHistorial');
+const synth = window.speechSynthesis;
 
-let historialData = []; // Nuestra "Base de datos" temporal
+let historialData = [];
 
-// FUNCIÓN PRINCIPAL DE TRADUCCIÓN
+// FUNCIÓN PRINCIPAL DE TRADUCCIÓN (Google Translate Free)
 btnTraducir.onclick = async () => {
     const textoOriginal = etInput.value.trim();
 
@@ -19,19 +16,18 @@ btnTraducir.onclick = async () => {
         return;
     }
 
-    // Estado de carga (Equivalente a mostrar un ProgressBar en Android)
     btnTraducir.disabled = true;
     btnTraducir.innerText = "Traduciendo...";
 
     try {
-        const response = await fetch(`https://api-free.deepl.com/v2/translate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `auth_key=${DEEPL_API_KEY}&text=${encodeURIComponent(textoOriginal)}&target_lang=JA`
-        });
+        // Usamos el endpoint gratuito de Google Translate
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
 
+        const response = await fetch(url);
         const data = await response.json();
-        const textoJapones = data.translations[0].text;
+
+        // El formato de Google es un array complejo, el texto traducido está en data[0][0][0]
+        const textoJapones = data[0][0][0];
 
         const nuevoItem = {
             id: Date.now(),
@@ -42,53 +38,52 @@ btnTraducir.onclick = async () => {
         historialData.push(nuevoItem);
         renderizarCard(nuevoItem);
 
-        etInput.value = ""; // Limpiar el input
+        etInput.value = "";
     } catch (error) {
         console.error("Error:", error);
-        alert("Error al conectar con la API de DeepL.");
+        alert("Error al conectar con el servicio de traducción.");
     } finally {
         btnTraducir.disabled = false;
         btnTraducir.innerText = "Traducir";
     }
 };
 
-// FUNCIÓN PARA RENDERIZAR (Equivalente al Adapter de Android)
+// FUNCIÓN PARA RENDERIZAR
 function renderizarCard(item) {
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
-                                                                                                                                                                                                                                                                        <div class="texto-container">
-                                                                                                                                                                                                                                                                                    <p class="tv-original">${item.original}</p>
-                                                                                                                                                                                                                                                                                                <p class="tv-japones">${item.japones}</p>
-                                                                                                                                                                                                                                                                                                        </div>
-                                                                                                                                                                                                                                                                                                                <div class="actions">
-                                                                                                                                                                                                                                                                                                                            <button title="Escuchar" onclick="reproducirVoz('${item.japones}')">🔊</button>
-                                                                                                                                                                                                                                                                                                                                        <button title="Copiar" onclick="copiarTexto('${item.japones}')">📋</button>
-                                                                                                                                                                                                                                                                                                                                                </div>
-                                                                                                                                                                                                                                                                                                                                                    `;
-    // Insertamos al principio de la lista (como un RecyclerView con LayoutManager invertido)
+                                                                                                                                                                                                                                                                <div class="texto-container">
+                                                                                                                                                                                                                                                                            <p class="tv-original">${item.original}</p>
+                                                                                                                                                                                                                                                                                        <p class="tv-japones">${item.japones}</p>
+                                                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                                                                                                                        <div class="actions">
+                                                                                                                                                                                                                                                                                                                    <button title="Escuchar" onclick="reproducirVoz('${item.japones}')">🔊</button>
+                                                                                                                                                                                                                                                                                                                                <button title="Copiar" onclick="copiarTexto('${item.japones}')">📋</button>
+                                                                                                                                                                                                                                                                                                                                        </div>
+                                                                                                                                                                                                                                                                                                                                            `;
     rvHistorial.prepend(card);
 }
 
-// TEXT TO SPEECH (Equivalente a TextToSpeech.OnInitListener)
+// VOZ (Text To Speech)
 function reproducirVoz(texto) {
     const utterance = new SpeechSynthesisUtterance(texto);
     utterance.lang = 'ja-JP';
     synth.speak(utterance);
 }
 
-// COPIAR AL PORTAPAPELES (Equivalente a ClipboardManager)
+// COPIAR
 function copiarTexto(texto) {
     navigator.clipboard.writeText(texto).then(() => {
         alert("Texto copiado");
     });
 }
 
-// EXPORTAR A CSV (Equivalente a tu función saveCsv)
+// EXPORTAR A CSV
 btnExportar.onclick = () => {
     if (historialData.length === 0) return alert("No hay datos para exportar.");
 
-    let csvContent = "\uFEFFOriginal,Japones\n"; // \uFEFF ayuda con los caracteres japoneses en Excel
+    let csvContent = "\uFEFFOriginal,Japones\n";
     historialData.forEach(item => {
         csvContent += `"${item.original}","${item.japones}"\n`;
     });
@@ -98,7 +93,5 @@ btnExportar.onclick = () => {
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute("download", "Estudio_Japones.csv");
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
 };
