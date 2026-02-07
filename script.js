@@ -89,18 +89,15 @@ btnTraducir.onclick = async () => {
             if(data.responseStatus !== 200) throw new Error("MyMemory limit/error");
             textoJapones = data.responseData.translatedText;
         } catch (errMyMemory) {
-            console.warn("Fallo MyMemory, intentando Google...", errMyMemory);
+            console.warn("Fallo MyMemory, intentando Lingva...", errMyMemory);
             
-            // Fallback: Google Translate vía AllOrigins (con timestamp para evitar caché)
-            const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(googleUrl)}&timestamp=${Date.now()}`;
-            
-            const response = await fetch(proxyUrl);
+            // Fallback: Lingva Translate (Más estable que Google Proxy)
+            const lingvaUrl = `https://lingva.ml/api/v1/es/ja/${encodeURIComponent(textoOriginal)}`;
+            const response = await fetch(lingvaUrl);
             const data = await response.json();
-            if (!data.contents) throw new Error("Proxy sin respuesta");
             
-            const googleData = JSON.parse(data.contents);
-            textoJapones = googleData[0].map(s => s[0]).join('');
+            if (!data.translation) throw new Error("Lingva sin respuesta");
+            textoJapones = data.translation;
         }
 
         const item = {
@@ -125,16 +122,17 @@ btnTraducir.onclick = async () => {
 function agregarCard(item) {
     const card = document.createElement('div');
     card.className = 'card';
+    const safeText = item.japonesLimpio.replace(/'/g, "\\'");
     card.innerHTML = `
-                                                                                                                                                                                                                                    <div>
-                                                                                                                                                                                                                                                <p class="tv-original">${item.original}</p>
-                                                                                                                                                                                                                                                            <p class="tv-japones">${item.japonesHTML}</p>
-                                                                                                                                                                                                                                                                    </div>
-                                                                                                                                                                                                                                                                            <div class="actions">
-                                                                                                                                                                                                                                                                                        <button onclick="hablar('${item.japonesLimpio}')">🔊</button>
-                                                                                                                                                                                                                                                                                                    <button onclick="copiar('${item.japonesLimpio}')">📋</button>
-                                                                                                                                                                                                                                                                                                            </div>
-                                                                                                                                                                                                                                                                                                                `;
+        <div>
+            <p class="tv-original">${item.original}</p>
+            <p class="tv-japones">${item.japonesHTML}</p>
+        </div>
+        <div class="actions">
+            <button onclick="hablar('${safeText}')">🔊</button>
+            <button onclick="copiar('${safeText}')">📋</button>
+        </div>
+    `;
     rvHistorial.prepend(card);
 }
 
