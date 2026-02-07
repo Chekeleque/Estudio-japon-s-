@@ -30,7 +30,10 @@ async function initKuroshiro() {
             kuroshiroListo = true;
             btnTraducir.innerText = "Traducir"; // Restauramos el texto cuando termine
             console.log("Furigana listo");
-        }).catch(e => console.error("Error cargando Furigana:", e));
+        }).catch(e => {
+            console.error("Error cargando Furigana:", e);
+            btnTraducir.innerText = "Traducir (Sin Furigana)";
+        });
         
     } catch (e) {
         console.warn("Fallo al cargar Furigana (modo texto):", e);
@@ -89,15 +92,19 @@ btnTraducir.onclick = async () => {
             if(data.responseStatus !== 200) throw new Error("MyMemory limit/error");
             textoJapones = data.responseData.translatedText;
         } catch (errMyMemory) {
-            console.warn("Fallo MyMemory, intentando Lingva...", errMyMemory);
+            console.warn("Fallo MyMemory, intentando Google (Proxy)...", errMyMemory);
             
-            // Fallback: Lingva Translate (Más estable que Google Proxy)
-            const lingvaUrl = `https://lingva.ml/api/v1/es/ja/${encodeURIComponent(textoOriginal)}`;
-            const response = await fetch(lingvaUrl);
+            // Fallback: Google Translate vía AllOrigins (Raw)
+            // Usamos 'raw' para obtener el JSON directo sin problemas de parseo
+            const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(googleUrl)}`;
+            
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Google Proxy falló");
+            
             const data = await response.json();
-            
-            if (!data.translation) throw new Error("Lingva sin respuesta");
-            textoJapones = data.translation;
+            // Parseamos la respuesta de Google: [[["texto", "original", ...], ...], ...]
+            textoJapones = data[0].map(s => s[0]).join('');
         }
 
         const item = {
