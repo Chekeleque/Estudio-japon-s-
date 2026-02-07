@@ -8,10 +8,20 @@ const synth = window.speechSynthesis;
 const kuroshiro = new Kuroshiro();
 let kuroshiroListo = false;
 
+// Deshabilitamos el botón mientras carga el diccionario de Furigana
+btnTraducir.disabled = true;
+btnTraducir.innerText = "Cargando recursos...";
+
 kuroshiro.init(new KuroshiroAnalyzerKuromoji({
     dictPath: "https://takuyaa.github.io/kuromoji.js/dict"
 })).then(() => {
     kuroshiroListo = true;
+    btnTraducir.disabled = false;
+    btnTraducir.innerText = "Traducir";
+}).catch(() => {
+    // Si falla la carga, permitimos traducir pero sin Furigana
+    btnTraducir.disabled = false;
+    btnTraducir.innerText = "Traducir";
 });
 
 let historialData = [];
@@ -37,7 +47,9 @@ btnTraducir.onclick = async () => {
         const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`)}`;
         const response = await fetch(url);
         const data = await response.json();
-        const textoJapones = data[0][0][0];
+        
+        // Unimos todos los segmentos traducidos (Google divide por oraciones)
+        const textoJapones = data[0].map(segmento => segmento[0]).join('');
 
         const item = {
             original: textoOriginal,
