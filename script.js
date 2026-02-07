@@ -26,7 +26,8 @@ async function initKuroshiro() {
         // Iniciamos la carga en segundo plano sin bloquear el botón
         kuroshiro.init(analyzer).then(() => {
             kuroshiroListo = true;
-            console.log("Furigana cargado correctamente");
+            btnTraducir.innerText = "Traducir"; // Restauramos el texto cuando termine
+            console.log("Furigana listo");
         }).catch(e => console.error("Error cargando Furigana:", e));
         
     } catch (e) {
@@ -34,7 +35,8 @@ async function initKuroshiro() {
     } finally {
         // Habilitamos el botón inmediatamente para permitir traducir (aunque sea sin Furigana al principio)
         btnTraducir.disabled = false;
-        btnTraducir.innerText = "Traducir";
+        // Avisamos al usuario si el Furigana aún está cargando en segundo plano
+        if (!kuroshiroListo) btnTraducir.innerText = "Traducir (Cargando Furigana...)";
     }
 }
 
@@ -65,18 +67,15 @@ btnTraducir.onclick = async () => {
     btnTraducir.innerText = "...";
 
     try {
-        // Cambiamos a api.allorigins.win/get que es más confiable para evitar bloqueos CORS
-        const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
-        const url = `https://api.allorigins.win/get?url=${encodeURIComponent(googleUrl)}`;
+        // CAMBIO PRINCIPAL: Usamos MyMemory API.
+        // Es gratuita, soporta CORS nativamente y es mucho más estable que los proxies de Google.
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textoOriginal)}&langpair=es|ja`;
         
         const response = await fetch(url);
         const data = await response.json();
         
-        // allorigins devuelve la respuesta real dentro de la propiedad 'contents' como texto
-        const respuestaGoogle = JSON.parse(data.contents);
-        
-        // Unimos todos los segmentos traducidos (Google divide por oraciones)
-        const textoJapones = respuestaGoogle[0].map(segmento => segmento[0]).join('');
+        if(data.responseStatus !== 200) throw new Error(data.responseDetails);
+        const textoJapones = data.responseData.translatedText;
 
         const item = {
             original: textoOriginal,
@@ -92,7 +91,8 @@ btnTraducir.onclick = async () => {
         alert("Error al traducir");
     } finally {
         btnTraducir.disabled = false;
-        btnTraducir.innerText = "Traducir";
+        // Mantenemos el estado del botón correcto
+        btnTraducir.innerText = kuroshiroListo ? "Traducir" : "Traducir (Cargando Furigana...)";
     }
 };
 
