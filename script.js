@@ -12,17 +12,27 @@ let kuroshiroListo = false;
 btnTraducir.disabled = true;
 btnTraducir.innerText = "Cargando recursos...";
 
-kuroshiro.init(new KuroshiroAnalyzerKuromoji({
-    dictPath: "https://takuyaa.github.io/kuromoji.js/dict"
-})).then(() => {
-    kuroshiroListo = true;
-    btnTraducir.disabled = false;
-    btnTraducir.innerText = "Traducir";
-}).catch(() => {
-    // Si falla la carga, permitimos traducir pero sin Furigana
-    btnTraducir.disabled = false;
-    btnTraducir.innerText = "Traducir";
-});
+// Promesa de inicialización con la ruta corregida (necesita la barra al final)
+const initKuroshiro = kuroshiro.init(new KuroshiroAnalyzerKuromoji({
+    dictPath: "https://takuyaa.github.io/kuromoji.js/dict/"
+}));
+
+// Timeout de seguridad (10s) por si la red es lenta o falla la carga
+const timeoutCarga = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error("Tiempo de espera agotado")), 10000)
+);
+
+Promise.race([initKuroshiro, timeoutCarga])
+    .then(() => {
+        kuroshiroListo = true;
+    })
+    .catch((e) => {
+        console.warn("Fallo al cargar Furigana, funcionando en modo solo texto:", e);
+    })
+    .finally(() => {
+        btnTraducir.disabled = false;
+        btnTraducir.innerText = "Traducir";
+    });
 
 let historialData = [];
 
