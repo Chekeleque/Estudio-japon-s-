@@ -7,6 +7,7 @@ const synth = window.speechSynthesis;
 // Inicialización de Kuroshiro para Furigana dinámico
 let kuroshiro = null;
 let kuroshiroListo = false;
+let promesaKuroshiro = null; // Variable para controlar la carga en progreso
 
 async function initKuroshiro() {
     btnTraducir.disabled = true;
@@ -23,8 +24,9 @@ async function initKuroshiro() {
             dictPath: "https://takuyaa.github.io/kuromoji.js/dict/"
         });
 
-        // Iniciamos la carga en segundo plano sin bloquear el botón
-        kuroshiro.init(analyzer).then(() => {
+        // Guardamos la promesa de inicialización
+        promesaKuroshiro = kuroshiro.init(analyzer);
+        promesaKuroshiro.then(() => {
             kuroshiroListo = true;
             btnTraducir.innerText = "Traducir"; // Restauramos el texto cuando termine
             console.log("Furigana listo");
@@ -46,6 +48,16 @@ let historialData = [];
 
 // Función para generar Furigana real usando Kuroshiro
 async function aplicarFurigana(texto) {
+    // Si la librería se está cargando, esperamos a que termine en lugar de saltarnos el paso
+    if (!kuroshiroListo && promesaKuroshiro) {
+        console.log("Esperando a que termine la carga de Furigana...");
+        try {
+            await promesaKuroshiro;
+        } catch (e) {
+            console.warn("No se pudo cargar Furigana tras esperar.");
+        }
+    }
+
     if (kuroshiroListo && kuroshiro) {
         try {
             return await kuroshiro.convert(texto, { to: "hiragana", mode: "furigana" });
@@ -64,18 +76,32 @@ btnTraducir.onclick = async () => {
     if (!textoOriginal) return;
 
     btnTraducir.disabled = true;
-    btnTraducir.innerText = "...";
+    btnTraducir.innerText = "Traduciendo...";
+
+    let textoJapones = "";
 
     try {
-        // CAMBIO PRINCIPAL: Usamos MyMemory API.
-        // Es gratuita, soporta CORS nativamente y es mucho más estable que los proxies de Google.
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textoOriginal)}&langpair=es|ja`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if(data.responseStatus !== 200) throw new Error(data.responseDetails);
-        const textoJapones = data.responseData.translatedText;
+        // ESTRATEGIA ROBUSTA: Intento 1 (MyMemory) -> Fallo -> Intento 2 (Google Proxy)
+        try {
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textoOriginal)}&langpair=es|ja`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if(data.responseStatus !== 200) throw new Error("MyMemory limit/error");
+            textoJapones = data.responseData.translatedText;
+        } catch (errMyMemory) {
+            console.warn("Fallo MyMemory, intentando Google...", errMyMemory);
+            
+            // Fallback: Google Translate vía AllOrigins (con timestamp para evitar caché)
+            const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(googleUrl)}&timestamp=${Date.now()}`;
+            
+            const response = await fetch(proxyUrl);
+            const data = await response.json();
+            if (!data.contents) throw new Error("Proxy sin respuesta");
+            
+            const googleData = JSON.parse(data.contents);
+            textoJapones = googleData[0].map(s => s[0]).join('');
+        }
 
         const item = {
             original: textoOriginal,
