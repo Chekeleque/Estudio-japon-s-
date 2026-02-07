@@ -23,15 +23,16 @@ async function initKuroshiro() {
             dictPath: "https://takuyaa.github.io/kuromoji.js/dict/"
         });
 
-        await Promise.race([
-            kuroshiro.init(analyzer),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
-        ]);
-
-        kuroshiroListo = true;
+        // Iniciamos la carga en segundo plano sin bloquear el botón
+        kuroshiro.init(analyzer).then(() => {
+            kuroshiroListo = true;
+            console.log("Furigana cargado correctamente");
+        }).catch(e => console.error("Error cargando Furigana:", e));
+        
     } catch (e) {
         console.warn("Fallo al cargar Furigana (modo texto):", e);
     } finally {
+        // Habilitamos el botón inmediatamente para permitir traducir (aunque sea sin Furigana al principio)
         btnTraducir.disabled = false;
         btnTraducir.innerText = "Traducir";
     }
@@ -62,8 +63,9 @@ btnTraducir.onclick = async () => {
     btnTraducir.innerText = "...";
 
     try {
-        // Usamos un proxy (allorigins) para evitar el error de CORS al llamar a Google Translate
-        const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`)}`;
+        // Usamos corsproxy.io que es más estable y forzamos sl=es (español)
+        const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
+        const url = `https://corsproxy.io/?${encodeURIComponent(googleUrl)}`;
         const response = await fetch(url);
         const data = await response.json();
         
@@ -80,6 +82,7 @@ btnTraducir.onclick = async () => {
         agregarCard(item);
         etInput.value = "";
     } catch (e) {
+        console.error(e);
         alert("Error al traducir");
     } finally {
         btnTraducir.disabled = false;
