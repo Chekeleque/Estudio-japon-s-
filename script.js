@@ -4,17 +4,24 @@ const btnExportar = document.getElementById('btnExportar');
 const rvHistorial = document.getElementById('rvHistorial');
 const synth = window.speechSynthesis;
 
+// Inicialización de Kuroshiro para Furigana dinámico
+const kuroshiro = new Kuroshiro();
+let kuroshiroListo = false;
+
+kuroshiro.init(new KuroshiroAnalyzerKuromoji({
+    dictPath: "https://takuyaa.github.io/kuromoji.js/dict"
+})).then(() => {
+    kuroshiroListo = true;
+});
+
 let historialData = [];
 
-// Función para simular el "textoJaponesRuby" del ViewModel
-function aplicarFurigana(texto) {
-    const diccionario = {
-        "来る": "<ruby>来<rt>く</rt></ruby>る",
-        "指示": "<ruby>指<rt>し</rt>示<rt>じ</rt></ruby>",
-        "今": "<ruby>今<rt>いま</rt></ruby>",
-        "食べる": "<ruby>食<rt>た</rt></ruby>べる"
-    };
-    return diccionario[texto] || texto;
+// Función para generar Furigana real usando Kuroshiro
+async function aplicarFurigana(texto) {
+    if (kuroshiroListo) {
+        return await kuroshiro.convert(texto, { to: "hiragana", mode: "furigana" });
+    }
+    return texto;
 }
 
 // Lógica de traducción
@@ -26,14 +33,15 @@ btnTraducir.onclick = async () => {
     btnTraducir.innerText = "...";
 
     try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
+        // Usamos un proxy (allorigins) para evitar el error de CORS al llamar a Google Translate
+        const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`)}`;
         const response = await fetch(url);
         const data = await response.json();
         const textoJapones = data[0][0][0];
 
         const item = {
             original: textoOriginal,
-            japonesHTML: aplicarFurigana(textoJapones),
+            japonesHTML: await aplicarFurigana(textoJapones),
             japonesLimpio: textoJapones
         };
 
