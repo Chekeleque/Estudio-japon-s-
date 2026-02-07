@@ -50,6 +50,8 @@ async function aplicarFurigana(texto) {
         } catch (e) {
             console.error(e);
         }
+    } else {
+        console.warn("Furigana no aplicado: La librería aún se está cargando o falló.");
     }
     return texto;
 }
@@ -63,14 +65,18 @@ btnTraducir.onclick = async () => {
     btnTraducir.innerText = "...";
 
     try {
-        // Usamos corsproxy.io que es más estable y forzamos sl=es (español)
+        // Cambiamos a api.allorigins.win/get que es más confiable para evitar bloqueos CORS
         const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
-        const url = `https://corsproxy.io/?${encodeURIComponent(googleUrl)}`;
+        const url = `https://api.allorigins.win/get?url=${encodeURIComponent(googleUrl)}`;
+        
         const response = await fetch(url);
         const data = await response.json();
         
+        // allorigins devuelve la respuesta real dentro de la propiedad 'contents' como texto
+        const respuestaGoogle = JSON.parse(data.contents);
+        
         // Unimos todos los segmentos traducidos (Google divide por oraciones)
-        const textoJapones = data[0].map(segmento => segmento[0]).join('');
+        const textoJapones = respuestaGoogle[0].map(segmento => segmento[0]).join('');
 
         const item = {
             original: textoOriginal,
