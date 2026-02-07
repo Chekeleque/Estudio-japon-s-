@@ -5,41 +5,50 @@ const rvHistorial = document.getElementById('rvHistorial');
 const synth = window.speechSynthesis;
 
 // Inicialización de Kuroshiro para Furigana dinámico
-const kuroshiro = new Kuroshiro();
+let kuroshiro = null;
 let kuroshiroListo = false;
 
-// Deshabilitamos el botón mientras carga el diccionario de Furigana
-btnTraducir.disabled = true;
-btnTraducir.innerText = "Cargando recursos...";
+async function initKuroshiro() {
+    btnTraducir.disabled = true;
+    btnTraducir.innerText = "Cargando recursos...";
 
-// Promesa de inicialización con la ruta corregida (necesita la barra al final)
-const initKuroshiro = kuroshiro.init(new KuroshiroAnalyzerKuromoji({
-    dictPath: "https://takuyaa.github.io/kuromoji.js/dict/"
-}));
+    try {
+        // Verificamos que las librerías existan antes de usarlas para evitar crashes
+        if (typeof Kuroshiro === 'undefined' || typeof KuroshiroAnalyzerKuromoji === 'undefined') {
+            throw new Error("Librerías no cargadas");
+        }
 
-// Timeout de seguridad (10s) por si la red es lenta o falla la carga
-const timeoutCarga = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error("Tiempo de espera agotado")), 10000)
-);
+        kuroshiro = new Kuroshiro();
+        const analyzer = new KuroshiroAnalyzerKuromoji({
+            dictPath: "https://takuyaa.github.io/kuromoji.js/dict/"
+        });
 
-Promise.race([initKuroshiro, timeoutCarga])
-    .then(() => {
+        await Promise.race([
+            kuroshiro.init(analyzer),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
+        ]);
+
         kuroshiroListo = true;
-    })
-    .catch((e) => {
-        console.warn("Fallo al cargar Furigana, funcionando en modo solo texto:", e);
-    })
-    .finally(() => {
+    } catch (e) {
+        console.warn("Fallo al cargar Furigana (modo texto):", e);
+    } finally {
         btnTraducir.disabled = false;
         btnTraducir.innerText = "Traducir";
-    });
+    }
+}
+
+initKuroshiro();
 
 let historialData = [];
 
 // Función para generar Furigana real usando Kuroshiro
 async function aplicarFurigana(texto) {
-    if (kuroshiroListo) {
-        return await kuroshiro.convert(texto, { to: "hiragana", mode: "furigana" });
+    if (kuroshiroListo && kuroshiro) {
+        try {
+            return await kuroshiro.convert(texto, { to: "hiragana", mode: "furigana" });
+        } catch (e) {
+            console.error(e);
+        }
     }
     return texto;
 }
