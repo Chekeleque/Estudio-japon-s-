@@ -84,7 +84,7 @@ btnTraducir.onclick = async () => {
     let textoJapones = "";
 
     try {
-        // ESTRATEGIA ROBUSTA: Intento 1 (MyMemory) -> Fallo -> Intento 2 (Google Proxy)
+        // ESTRATEGIA ROBUSTA: Intento 1 (MyMemory) -> Fallo -> Intento 2 (CorsProxy) -> Fallo -> Intento 3 (AllOrigins)
         try {
             const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textoOriginal)}&langpair=es|ja`;
             const response = await fetch(url);
@@ -92,20 +92,33 @@ btnTraducir.onclick = async () => {
             if(data.responseStatus !== 200) throw new Error("MyMemory limit/error");
             textoJapones = data.responseData.translatedText;
         } catch (errMyMemory) {
-            console.warn("Fallo MyMemory, intentando Google (Proxy)...", errMyMemory);
+            console.warn("Fallo MyMemory, intentando Google (CorsProxy)...", errMyMemory);
             
-            // Fallback: Google Translate vía AllOrigins (Raw)
-            // Usamos 'raw' para obtener el JSON directo sin problemas de parseo
             const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=ja&dt=t&q=${encodeURIComponent(textoOriginal)}`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(googleUrl)}`;
             
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Google Proxy falló");
-            
-            const data = await response.json();
-            // Parseamos la respuesta de Google: [[["texto", "original", ...], ...], ...]
-            textoJapones = data[0].map(s => s[0]).join('');
+            try {
+                // Fallback 1: Google Translate vía CorsProxy.io (Suele ser más rápido y estable)
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(googleUrl)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error("CorsProxy falló");
+                
+                const data = await response.json();
+                textoJapones = data[0].map(s => s[0]).join('');
+            } catch (errCors) {
+                console.warn("Fallo CorsProxy, intentando AllOrigins...", errCors);
+
+                // Fallback 2: Google Translate vía AllOrigins (con timestamp para evitar caché)
+                const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(googleUrl)}&timestamp=${Date.now()}`;
+                const response2 = await fetch(proxyUrl2);
+                if (!response2.ok) throw new Error("AllOrigins falló");
+                
+                const data2 = await response2.json();
+                // Parseamos la respuesta de Google: [[["texto", "original", ...], ...], ...]
+                textoJapones = data2[0].map(s => s[0]).join('');
+            }
         }
+
+        if (!textoJapones) throw new Error("No se pudo traducir. Intenta más tarde.");
 
         const item = {
             original: textoOriginal,
