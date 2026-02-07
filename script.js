@@ -118,7 +118,7 @@ btnTraducir.onclick = async () => {
         etInput.value = "";
     } catch (e) {
         console.error(e);
-        alert("Error al traducir");
+            alert("Error al traducir: " + e.message);
     } finally {
         btnTraducir.disabled = false;
         // Mantenemos el estado del botón correcto
